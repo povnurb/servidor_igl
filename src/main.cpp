@@ -50,7 +50,7 @@ byte subnet[] = {
 byte mac[] = { 
   0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0x01 }; //variar por sala
   //esto es un registro
-//0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0x01 para igl pmct es
+//0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0x01 para la sala igl pmct es
 
 //Ethernet Port
 EthernetServer server = EthernetServer(80); //default html port 80
@@ -105,6 +105,7 @@ String allOff = "";
 boolean reading = false;
 boolean outputStatus[10]; //Create a boolean array for the maximum ammount.
 String rev = "V17 NO FINGER";  //indica la version del firmware
+String sala = "SALA PMCT IGL"; //variable que apenas voy a utilizar para variar los nombres
 unsigned long timeConnectedAt;
 boolean writeToEeprom = false;
 //EthernetClient client;
@@ -113,7 +114,7 @@ boolean writeToEeprom = false;
 /////////////////////////////////////////////////
 
 String tempOutDeg;
-String tempOutDeg2;
+String humOutDeg2;
 
 //funciones que faltaron declarar ______________________________________________________
 void initEepromValues();
@@ -219,7 +220,7 @@ void loop(){
   String to_send = String(temp_c);
   String to_send2 = String(humedad);
   tempOutDeg = to_send;
-  tempOutDeg2 = to_send2;
+  humOutDeg2 = to_send2;
   lcd.setCursor(0,0);
   lcd.print("TEMP: "+ to_send +" C   ");
   lcd.setCursor(0,1);
@@ -465,7 +466,7 @@ void printHtmlButtons(EthernetClient client){
   client.print("</h4></td>\n");          
   client.print("<td>");
   client.print("<h2>");
-  client.print(tempOutDeg2);// valor de la Humedad
+  client.print(humOutDeg2);// valor de la Humedad
   client.print(" %</h2></td>\n");
   client.print("<td></td>");
   client.print("</tr>");
@@ -628,9 +629,14 @@ void initEepromValues(){
           client.println("<head>");
 
           // add page title 
-          client.println("<title>SALA PMCT IGL</title>");
-          client.println("<meta charset='UTF-8' name=\"description\" content=\"PTTI HGO\"/>");
-
+          //client.println("<title>SALA PMCT IGL</title>");
+          client.print("<title>");
+          client.print(sala);
+          client.println("</title>");
+          //client.println("<meta charset='UTF-8' name=\"description\" content=\"PMCT IGL\"/>");
+          client.print("<meta charset='UTF-8' name=\"description\" content=\"");
+          client.print(sala);
+          client.println("\"/>");
           // add a meta refresh tag, so the browser pulls again every x seconds:
           client.print("<meta http-equiv=\"refresh\" content=\"");
           client.print(refreshPage);
@@ -806,7 +812,7 @@ void initEepromValues(){
           client.println("      border-radius: 10px;");
           client.println("      height: 1px;");
           client.println("      width: 13px;");
-          client.println("      padding: 5px 0;"); //5px 0;
+          client.println("      padding: 5px 0;"); 
           client.println("      background-color: rgba(200, 200, 200, 0.25);");
           client.println("      background-image: -webkit-gradient(linear, 0% 0%, 0% 95%, from(rgba(255, 255, 255, 0.7)), to(rgba(255, 255, 255, 0)));");
           client.println("    }");
@@ -821,7 +827,10 @@ void initEepromValues(){
           client.println("<body>");
           client.println("<div class=\"view\">");
           client.println("    <div class=\"header-wrapper\">");
-          client.println("      <h1>SALA PMCT IGL</h1>");
+          //client.println("      <h1>SALA PMCT IGL</h1>");
+          client.print("<h1>");
+          client.print(sala);
+          client.println("</h1>");
           client.println("    </div>");
 
 //////
