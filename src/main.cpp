@@ -1,17 +1,14 @@
 /**pendientes
- * corregir la variable de humedad ya que dice tempOutDeg2 a humOutDeg y
- * utilizar el siguiente ejemplo para poner una variable que modifique el 
- * nombre de la sala mas rapido
- * client.print("<h2>");
-  client.print(tempOutDeg2);// valor de la Humedad
-  client.print(" %</h2></td>\n");
+ * hay que agregar un interruptor el cual permitira dar acceso remoto para activar las 
+ * alarmas sugerencia el pin 14 
+ * si es posible quitar una libreria que no se use para liberar espacio en memoria ram
   */
 
 //este programa verifica via ethernet las alarmas y las indica tambien sin red
 //en la sala pmct igl se alimenta con regulador de 7.5 volts
 //funciona con tierras para activarse
 //https://aprendiendoarduino.wordpress.com/tag/pullup/
-#include <Arduino.h>
+//#include <Arduino.h>
 #include <Adafruit_Sensor.h> //libreria Adafruit Unified Sensor
 #include <DHT.h>//libreria DHT sensor library
 #include <DHT_U.h>
@@ -33,7 +30,7 @@ DHT_Unified dht(DHTPIN, DHTTYPE);
 uint32_t delayMS;
 float temp_c;
 float humedad;
-
+//int cont=0; //contador para evitar el hardcodeo por la url
 ////////////////////////////////////////////////////////////////////////
 //CONFIGURACION Ethernet
 ////////////////////////////////////////////////////////////////////////
@@ -42,7 +39,7 @@ float humedad;
 byte ip[] = { 
   10, 138, 139, 20 };   //13.4.30.52 trabajo, en casa 192, 168, 1, 78 
 byte gateway[] = { 
-  192, 138, 139, 254 }; //Manual setup only 13.4.30.254 trabajo lineas
+  10, 138, 139, 254 }; //Manual setup only 13.4.30.254 trabajo lineas
 byte subnet[] = { 
   255, 255, 255, 0 }; //Manual setup only no cambia
 
@@ -59,7 +56,7 @@ EthernetServer server = EthernetServer(80); //default html port 80
 int outputQuantity = 10;  //should not exceed 10 
 
 //Invert the output of the leds
-boolean outputInverted = true; //true or false para que funcione con tierras true
+boolean outputInverted = true; //true or false para que funcione con tierras tiene que ser true
 // This is done in case the relay board triggers the relay on negative, rather then on positive supply
 
 //Html page refresh
@@ -67,7 +64,7 @@ int refreshPage = 9; //default is 10sec.
 //Beware that if you make it refresh too fast, the page could become inacessable.
 
 //Display or hide the "Switch on all Pins" buttons at the bottom of page
-int switchOnAllPinsButton = true; //true or false
+int switchOnAllPinsButton = true; //true or false se cambiara segun el estado del pin o switch
 
 //Button Array
 //Just for a note, varables start from 0 to 9, as 0 is counted as well, thus 10 outputs.
@@ -83,10 +80,10 @@ int indicadoresLed[10] = {23,25,27,29,31,33,35,37,39,41};
 int buzzer = 40; //pin del BUZZER
 // Write the text description of the output channel se pueden cambiar
 String buttonText[10] = {
-  "01. Temp. Alta UNINET 2","02. Temp. Alta UNINET 1","03. Descarga de Bat. UNINET 2",
-  "04. F. Rect UNINET 2 (MEI)","05. F. Rect CTI(ALPHA)","06. Bat. en Descarga CTI",
-  "07. Temp. Alta CTI","08. F. Rect PMCT(EMERSON)",
-  "09. Bat. en Descarga PMCT","10. Temp. Alta PMCT"};
+  "01. F. RECT. PB MEI","02. DESCARGA DE BATERIAS.","03. BAJO VOLTAJE BAT",
+  "04. G. E. BLOQUEADO","05. ALTA TEMPERATURA","06. FALLA DE COMPRESOR",
+  "07. G. E. EN OPERACION","08. FALLA DE RED CFE",
+  "09. LIBRE","10. LIBRE"};
 
 // Set the output to retain the last status after power recycle.
 int retainOutputStatus[10] = {0,0,0,0,0,0,0,0,0};//1-retain the last status. 0-will be off after power cut.
@@ -104,11 +101,11 @@ String allOn = "";
 String allOff = "";
 boolean reading = false;
 boolean outputStatus[10]; //Create a boolean array for the maximum ammount.
-String rev = "V17 NO FINGER";  //indica la version del firmware
-String sala = "SALA PMCT IGL"; //variable que apenas voy a utilizar para variar los nombres
+String rev = "V19 CONTRASEÑA";  //indica la version del firmware
+String sala = "SALA PTTI IGL"; //variable que apenas voy a utilizar para variar los nombres
 unsigned long timeConnectedAt;
 boolean writeToEeprom = false;
-//EthernetClient client;
+boolean currentState = false;
 
 
 /////////////////////////////////////////////////
@@ -116,7 +113,7 @@ boolean writeToEeprom = false;
 String tempOutDeg;
 String humOutDeg2;
 
-//funciones que faltaron declarar ______________________________________________________
+//funciones que faltaron declarar en platformio pero no son necesarias en el id de arduino______________________________________________________
 void initEepromValues();
 void readEepromValues();
 void checkForClient();
@@ -161,7 +158,7 @@ void setup(){
     //delay(250);
     digitalWrite(indicadoresLed[var],LOW);
   }
-  boolean currentState = false;
+  //boolean currentState = false;
   for (int var = 0; var < outputQuantity; var++){
 
     pinMode(outputAddress[var], INPUT_PULLUP);       
@@ -182,8 +179,8 @@ void setup(){
   lcd.print("ETHERNET");
   delay(200);
   //Setting up the IP address. Comment out the one you dont need.
-  Ethernet.begin(mac); //for DHCP address. (Address will be printed to serial.)
-  //Ethernet.begin(mac, ip, gateway, subnet); //for manual setup. (Address is the one configured above.)
+  //Ethernet.begin(mac); //for DHCP address. (Address will be printed to serial.)
+  Ethernet.begin(mac, ip, gateway, subnet); //for manual setup. (Address is the one configured above.) cambiar 
 
   server.begin();
   Serial.print("Server started at ");
@@ -257,7 +254,7 @@ void checkForClient(){
           printHtmlHeader(client); //call for html header and css
           printLoginTitle(client);
           printHtmlFooter(client);
-          //sentHeader = true;
+          //sentHeader = true; //no recuerdo que hace hay que verificar
           break;
         }
         if(!sentHeader){
@@ -295,7 +292,7 @@ void checkForClient(){
           //if user input is L set output to 0
           if(c == 'L') {
             outp = 0;
-            //*********************************************************************
+            //*********************************************************************  tal vez los case se puedan quitar
             for (int var = 0; var < outputQuantity; var++){
                 pinMode(outputAddress[var], OUTPUT); //para activar alarmas al CNS
                 digitalWrite(outputAddress[var],LOW);
@@ -363,12 +360,24 @@ void checkForClient(){
   
     //And time of last page was served is more then a minute.
     if (millis() > (timeConnectedAt + 20000)){//tiempo que tarda en verificar si existe supervision 
-          //lo tengo en 10000
       lcd.setCursor(0,1);
   lcd.print("SIN  SUPERVISION");
   delay(1000);
-  //lcd.clear();
-for (int var = 0; var < outputQuantity; var++)  { //-----------------------     
+  //los pines se vuelven entrada y dejan de ser salida ya que si me hardcodean y salen de la pagina en automatico volveran a ser inputs--------------------------------------------------------------------------------------------------------------------------------
+  for (int var = 0; var < outputQuantity; var++){
+
+    pinMode(outputAddress[var], INPUT_PULLUP);       
+    if(outputInverted == true) {
+      if(outputStatus[var] == 0){currentState = true;}else{currentState = false;} //check outputStatus if off, switch output accordingly
+      digitalWrite(outputAddress[var], currentState); 
+    }
+    else{
+      if(outputStatus[var] == 0){currentState = false;}else{currentState = true;}//check outputStatus if off, switch output accordingly
+      digitalWrite(outputAddress[var], currentState);
+    }
+  }
+  
+for (int var = 0; var < outputQuantity; var++)  { //-----------------------------------------------------------------------------------------------------     
     
     if (digitalRead(outputAddress[var]) == true ){                                                             //If Output is ON
       if (outputInverted == false){   //esta en true                                                        //and if output is not inverted 
@@ -398,7 +407,7 @@ for (int var = 0; var < outputQuantity; var++)  { //-----------------------
   }
 }
 ////////////////////////////////////////////////////////////////////////
-//triggerPin Function
+//triggerPin Function cambia todos los leds a encendidos y apagados
 ////////////////////////////////////////////////////////////////////////
 //
 void triggerPin(int pin, EthernetClient client, int outp){
@@ -452,7 +461,7 @@ void printHtmlButtons(EthernetClient client){
   //Printing the Temperature
   client.print("<tr>\n");        
   client.print("<td><h4>");
-  client.print("Temperature");
+  client.print("Temperatura");
   client.print("</h4></td>\n");       
   client.print("<td>");
   client.print("<h2>");
@@ -488,7 +497,7 @@ void printHtmlButtons(EthernetClient client){
     client.print(buttonText[var]);
     client.print("</h4></td>\n");
     /*************************************************************************
-    //quite los botones ya que no los uso
+    //quite los botones individuales ya que no los uso
 
     //Prints the ON Buttons  //_________________________________________
     // client.print("<td>");
@@ -511,7 +520,7 @@ void printHtmlButtons(EthernetClient client){
 
     //Invert the LED display if output is inverted.
 
-    ////aqui pongo en verde o en azul segun la entrada y los leds//////////
+    ////aqui pongo en rojo o en azul segun la entrada y los leds//////////
 
     if (outputStatus[var] == true ){                                                            //If Output is ON
       if (outputInverted == false){   //error o no en el false                                                          //and if output is not inverted 
@@ -540,17 +549,19 @@ void printHtmlButtons(EthernetClient client){
   //Muestra el boton para encender todas las alarmas
   if (switchOnAllPinsButton == true ){
 
-    //Prints the ON All Pins Button
+    //Prints the OFF All Pins Button modificado
     client.print("<tr>\n<td><INPUT TYPE=\"button\" VALUE=\"NORMALIZAR");
-    client.print("\" onClick=\"parent.location='/?");
-    client.print(allOn);
+    //client.print("\" onClick=\"parent.location='/?");
+    client.print("\" onClick='apagar2()'");
+    //client.print(allOn);
     client.print("'\"></td>\n");
 
-    //Prints the OFF All Pins Button            
+    //Prints the ON All Pins Button modificado           
     client.print("<td><INPUT TYPE=\"button\" VALUE=\"ENCENDER");
-    client.print("\" onClick=\"parent.location='/?");
-    client.print(allOff);
-    client.print("'\"></td>\n<td></td>\n<td></td>\n</tr>\n");
+    //client.print("\" onClick=\"parent.location='/?");
+    client.print("\" onClick='encender()'");
+    //client.print(allOff);
+    client.print("></td>\n<td></td>\n<td></td>\n</tr>\n");
   }
 
   //Closing the table and form
@@ -574,7 +585,7 @@ void readOutputStatuses(){
 }
 
 ////////////////////////////////////////////////////////////////////////
-//readEepromValues Function
+//readEepromValues Function tal vez se pueda quitar para tener mas memoria
 ////////////////////////////////////////////////////////////////////////
 //Read EEprom values and save to outputStatus
 void readEepromValues(){
@@ -584,7 +595,7 @@ void readEepromValues(){
 }
 
 ////////////////////////////////////////////////////////////////////////
-//writeEepromValues Function
+//writeEepromValues Function, tal vez se pueda quitar esta funcion para tener mas memoria----------------------------
 ////////////////////////////////////////////////////////////////////////
 //Write EEprom values
 void writeEepromValues(){
@@ -595,7 +606,7 @@ void writeEepromValues(){
 } 
 
 ////////////////////////////////////////////////////////////////////////
-//initEepromValues Function
+//initEepromValues Function tal vez se pueda quitar esta funcion ------------------------------------------------------
 ////////////////////////////////////////////////////////////////////////
 //Initialiaze EEprom values
 //if eeprom values are not the correct format ie not euqual to 0 or 1 (thus greater then 1) initialize by putting 0
@@ -739,11 +750,9 @@ void initEepromValues(){
           client.println(".group-wrapper table {");
           client.println("    background-color: #fff;");
           client.println("    -webkit-border-radius: 10px;");
-
           client.println("    -moz-border-radius: 10px;");
           client.println("    -khtml-border-radius: 10px;");
           client.println("    border-radius: 10px;");
-
 
           client.println("    font-size: 17px;");
           client.println("    line-height: 20px;");
@@ -756,11 +765,8 @@ void initEepromValues(){
           client.println("    -moz-transform :scale(1);"); //Code for Mozilla Firefox
           client.println("    -moz-transform-origin: 0 0;");
 
-
-
           client.println("   }");
           client.println("");
-
 
           //how the green (ON) LED will look
           client.println(".green-circle {");
@@ -780,7 +786,6 @@ void initEepromValues(){
           client.println("    -webkit-box-shadow: rgba(11, 140, 27, 0.5) 0px 10px 16px;");
           client.println("    -moz-box-shadow: rgba(11, 140, 27, 0.5) 0px 10px 16px; /* FF 3.5+ */");
           client.println("    box-shadow: rgba(11, 140, 27, 0.5) 0px 10px 16px; /* FF 3.5+ */");
-
           client.println("    }");
           client.println("");
 
@@ -818,7 +823,6 @@ void initEepromValues(){
           client.println("    }");
           client.println("");
 
-
           //and finally this is the end of the style data and header
           client.println("</style>");
           client.println("</head>");
@@ -838,20 +842,86 @@ void initEepromValues(){
  } //end of htmlHeader
 
 ////////////////////////////////////////////////////////////////////////
-//htmlFooter Function
+//htmlFooter Function y funciones javaScript
 ////////////////////////////////////////////////////////////////////////
 //Prints html footer
 void printHtmlFooter(EthernetClient client){
     //Set Variables Before Exiting 
     printLastCommandOnce = false;
     printButtonMenuOnce = false;
-    allOn = "";
-    allOff = "";
-    
+    //allOn = "";
+    //allOff = "";
     //printing last part of the html
-    client.println("\n<h3 align=\"center\">USO INTERNO ING. EDUARDO SANCHEZ <br> Coatza - Abril - 2021 - ");
+    client.println("\n<h3 align=\"center\">SE VE MEJOR EN CHROME<br> Coatza - Abril - 2021 - ");
     client.println(rev);
-    client.println("</h3></div>\n</div>\n</body>\n</html>");
+    client.println("</h3></div>\n</div>");
+    client.println("<script>");
+    client.println("var tiempo;");  //tiempo
+    client.println("var normal = localStorage.getItem('normal');");
+    client.println("console.log(normal);");
+    //client.println("console.log('inicio del programa');");
+    //---------funcion encender 
+    client.println("function encender(){");
+    client.println("var response = prompt('Aviso: Por cuestiones de seguridad en dos minutos se normalizarán las alarmas. ¡Escribe la Contraseña!');");
+    client.println("if(response == 'Com Coatzacoalcos'){");
+    client.println("tiempo = Date.now()+120000;"); //valor en milisegundo ahorita 2 minutos aqui se modifica el tiempo que estara prendida las alarmas
+    client.println("console.log('en prueba con contraseña');");
+    client.println("localStorage.setItem('tiempo',tiempo);");
+    client.println("localStorage.setItem('normal',0);"); //esta corriendo en prueba por eso normal es 0
+    client.print(" window.location=");
+    client.print("'");
+    client.print("/?");
+    client.print(allOff); //aqui quedo encendido
+    client.print("'");
+    client.println("}");
+    client.println("}");
+    //------------------termina funcion encender
+    //------------------funcion del boton
+    client.println("evaluar();");
+    client.println("function apagar2(){");
+    client.println("localStorage.setItem('normal',1);"); //esta corriendo en normal por eso es 1
+    client.println("console.log('se debe apagar');");
+    client.print(" window.location=");
+    client.print("'");
+    client.print("/?");
+    client.print(allOn); //aqui apago
+    client.print("'");
+    client.println("}");
+    //----------------------------funcion que evalua si hay que apagar o encender las alarmas----------------------------------- 
+    client.println("function evaluar(){");
+    client.println("normal=localStorage.getItem('normal');"); //empieza a correr normal si es 1 quiere decir que no se a primido el boton de encender
+    client.println("tiempo = localStorage.getItem('tiempo');");//obtenemos el tiempo de localStorage
+    //-------------------------------si esta iniciando el programa--------------------------------------
+    client.println("if(normal==null){"); //si esta en normalquiere decir que no han oprimido el boton encender, y si el date.now() es mayor que el tiempo en localStorage
+    client.println("localStorage.setItem('normal',1);"); //esta corriendo en normal por eso es 1
+    client.println("}");
+    //---------------------------------------------------------------------
+    client.println("if(normal == 1 && Date.now()>tiempo){"); //si esta en normalquiere decir que no han oprimido el boton encender, y si el date.now() es mayor que el tiempo en localStorage
+    client.println("tiempo = Date.now()+1000;"); //incremento el tiempo para que este siempre sea mayor creo que para evitar un hardcode
+    client.println("localStorage.setItem('tiempo',tiempo);"); //y lo guardo en localStorage
+    client.println("console.log('aumento el tiempo en storage y sigue en condicion normal');");
+    client.println("setTimeout(apagar2,9000);");
+    //client.print(" window.location=");
+    //client.print("'");
+    //client.print("/?");
+    //client.print(allOn); //sigo apagado
+    //client.print("'");
+    client.println("}");
+    //---------------------------------termina apagando Estado = 0 y tiempo < => Estado = 0 y tiempo >
+    //---------------------------------------------------------------- se mantiene encendido sin cambios
+    client.println("if(normal==0 && Date.now()>tiempo){"); //si esta normal en 0 quiere decir que esta en prueba y si tiempo es mayor se a cumplido el tiempo y hay que apagar
+    client.println("localStorage.setItem('normal',1);"); //apago y pongo en normal por eso es 1
+    client.println("console.log('se acabó el tiempo por eso se apaga y se pone en condicion normal')");
+    client.println("console.log(tiempo)");
+    client.print(" window.location=");
+    client.print("'");
+    client.print("/?");
+    client.print(allOn); //es apagado
+    client.print("'");
+    client.println("}");
+    client.println("}");
+    client.println("</script>");
+    client.println("</body>\n</html>");
 
     delay(1); // give the web browser time to receive the data
 
@@ -860,9 +930,9 @@ void printHtmlFooter(EthernetClient client){
     Serial.println(" - Done, Closing Connection.");
     
     delay (2); //delay so that it will give time for client buffer to clear and does not repeat multiple pages.
-    
+    allOn="";
+    allOff = "";
  } //end of htmlFooter
-
 
 ////////////////////////////////////////////////////////////////////////
 //printHtmlButtonTitle Function
@@ -876,7 +946,7 @@ void printHtmlButtonTitle(EthernetClient client){
 
 
 ////////////////////////////////////////////////////////////////////////
-//printLoginTitle Function
+//printLoginTitle Function talvez se pueda quitar esta funcion  -----------------------------------------------------
 ////////////////////////////////////////////////////////////////////////
 //Prints html button title
 void printLoginTitle(EthernetClient client){
@@ -884,7 +954,3 @@ void printLoginTitle(EthernetClient client){
           client.println("    <h2>Please enter the user data to login.</h2>");
           client.println();
 }
-
-/********************
- * EN CARRERA LIBRE SIN GESTION SIN RED
- * */
